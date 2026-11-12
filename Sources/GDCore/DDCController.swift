@@ -359,7 +359,8 @@ public final class DDCController {
         let clamped = max(0, min(0xFFFF, value))
         let high = UInt8((clamped >> 8) & 0xFF)
         let low = UInt8(clamped & 0xFF)
-        let checksum = UInt8((0x6E ^ 0x51 ^ 0x84 ^ 0x03 ^ Int(code) ^ Int(high) ^ Int(low)) & 0xFF)
+        let header: UInt8 = 0x6E ^ 0x51 ^ 0x84 ^ 0x03
+        let checksum: UInt8 = header ^ code ^ high ^ low
         pace(id)
         var ok = false
         for _ in 0..<2 where !ok {
@@ -416,7 +417,7 @@ public final class DDCController {
             defer { lock.unlock() }
             pace(id)
             let hi = UInt8((offset >> 8) & 0xFF), lo = UInt8(offset & 0xFF)
-            let checksum = UInt8((0x6E ^ 0x51 ^ 0x83 ^ 0xF3 ^ Int(hi) ^ Int(lo)) & 0xFF)
+            let checksum: UInt8 = (0x6E ^ 0x51 ^ 0x83 ^ 0xF3 as UInt8) ^ hi ^ lo
             let sent = write([0x83, 0xF3, hi, lo, checksum], to: service)
             touch(id)
             guard sent else { failures += 1; continue }
