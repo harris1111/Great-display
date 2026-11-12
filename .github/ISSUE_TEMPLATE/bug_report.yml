@@ -1,0 +1,38 @@
+name: Bug report
+description: Something does not work, or a display behaves unexpectedly
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Great Display version
+      placeholder: "1.0.0 (Settings → About)"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and Mac model
+      placeholder: "macOS 15.2, MacBook Pro M3"
+    validations:
+      required: true
+  - type: textarea
+    id: displays
+    attributes:
+      label: Displays and connections
+      description: Monitor models and how each is connected (USB-C, HDMI, dock, DisplayLink…).
+    validations:
+      required: true
+  - type: textarea
+    id: probe
+    attributes:
+      label: Probe output
+      description: "Output of `/Applications/GreatDisplay.app/Contents/MacOS/GreatDisplay --probe` (and `--ddc-caps <id>` for brightness/DDC issues)."
+      render: json
