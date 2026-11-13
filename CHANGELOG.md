@@ -9,6 +9,8 @@ change under **Unreleased** in the same pull request.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-12
+
 ### Added
 
 - **Website** at https://thienduc12311.github.io/Great-display/ with an
@@ -71,5 +73,6 @@ First public release.
 - Universal (Apple Silicon and Intel) DMG and ZIP builds published by GitHub
   Actions.
 
-[Unreleased]: https://github.com/thienduc12311/Great-display/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/thienduc12311/Great-display/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/thienduc12311/Great-display/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/thienduc12311/Great-display/releases/tag/v1.0.0
