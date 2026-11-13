@@ -10,6 +10,12 @@
 </p>
 
 <p align="center">
+  <a href="https://thienduc12311.github.io/Great-display/"><b>Website</b></a> ·
+  <a href="https://thienduc12311.github.io/Great-display/#demo">Try the demo</a> ·
+  <a href="https://thienduc12311.github.io/Great-display/release-notes.html">Release notes</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/thienduc12311/Great-display/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/thienduc12311/Great-display?sort=semver"></a>
   <a href="https://github.com/thienduc12311/Great-display/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/thienduc12311/Great-display/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-blue">
@@ -188,6 +194,12 @@ Accessibility and Screen Recording grants survive rebuilds. See
   [CHANGELOG.md](CHANGELOG.md) section plus the merged pull requests.
   Developer ID signing and notarization switch on when the signing secrets are
   configured.
+- [`pages.yml`](.github/workflows/pages.yml) publishes the website in
+  [`website/`](website) to GitHub Pages whenever it, `CHANGELOG.md` or the icon
+  changes on `main`, and after each release. The release notes page is built
+  from `CHANGELOG.md`. Preview it locally with `make site-preview`; regenerate
+  the product film with `make promo-video`
+  ([`Scripts/make_promo_video.swift`](Scripts/make_promo_video.swift)).
 
 The release process is described in [docs/RELEASING.md](docs/RELEASING.md).
 
