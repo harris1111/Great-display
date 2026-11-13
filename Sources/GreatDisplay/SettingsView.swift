@@ -443,12 +443,19 @@ struct DisplaysOverviewView: View {
     private func confirmReset() {
         let alert = NSAlert()
         alert.messageText = "Reset all saved settings?"
-        alert.informativeText = "Saved display configurations, image adjustments, per-display preferences and virtual screen definitions are removed."
+        alert.informativeText = "Everything returns to its defaults: application, menu and keyboard preferences, saved display configurations, image adjustments, per-display preferences, stream options and virtual screen definitions. Connected virtual screens are disconnected and running streams stop."
         alert.addButton(withTitle: "Reset")
         alert.addButton(withTitle: "Cancel")
         if alert.runModal() == .alertFirstButtonReturn {
             for display in controller.displays { controller.resetImageAdjustments(for: display) }
+            // Their definitions are about to go: a screen or stream left
+            // running would have no page to stop it from.
+            FullScreenStreamController.shared.stopAll()
+            VirtualScreenManager.shared.destroyAll()
             store.resetAll()
+            // Brightness key handling is on by default again; the tap only
+            // starts here when Accessibility access is already granted.
+            if store.state.general.handleBrightnessKeys { _ = KeyboardController.shared.start() }
         }
     }
 }
@@ -502,7 +509,7 @@ struct DisplaySettingsView: View {
                                 ? "Switching off disconnects the virtual screen; its definition is kept."
                                 : "Switching off removes the display from the desktop without cutting its power.",
                               isOn: Binding(get: { true }, set: { if !$0 { disconnect() } }),
-                              enabled: display.isVirtual || canDisconnect)
+                              enabled: display.isVirtual ? !connectionFollowsAssociation : canDisconnect)
             SettingsRowDivider()
             SettingsButtonRow {
                 Button("Identify Visually") { controller.identify(display) }
@@ -547,6 +554,14 @@ struct DisplaySettingsView: View {
         DisplayManager.shared.canDisconnect && controller.displays.filter { !$0.isVirtual }.count > 1
     }
 
+    /// A virtual screen whose association rule decides when it is connected:
+    /// switching it off by hand would be undone by the rule.
+    private var connectionFollowsAssociation: Bool {
+        guard let active = virtualScreens.active.first(where: { $0.displayID == display.id }) else { return false }
+        let saved = store.state.virtualScreens.first { $0.id == active.id } ?? active.configuration
+        return saved.connectionFollowsAssociation
+    }
+
     private var displayType: String {
         if display.isBuiltIn { return "Built-in display" }
         if display.isVirtual { return "Virtual screen" }
@@ -569,7 +584,16 @@ struct DisplaySettingsView: View {
                 virtualScreens.destroy(active.id)
             }
         } else {
-            controller.disconnect(display)
+            if display.isMain {
+                let alert = NSAlert()
+                alert.messageText = "Disconnect \(display.name)?"
+                alert.informativeText = "This is the main display. The menu bar and Dock move to another display. It can be reconnected from the app menu or from Settings."
+                alert.addButton(withTitle: "Disconnect")
+                alert.addButton(withTitle: "Cancel")
+                guard alert.runModal() == .alertFirstButtonReturn else { return }
+            }
+            // Stay on this page when the display could not be disconnected.
+            guard controller.disconnect(display) else { return }
         }
         SettingsNavigation.shared.selectDevice(.displays)
     }
@@ -686,14 +710,19 @@ private struct BrightnessSettingsCard: View {
                                              set: { controller.setCombinedBrightness($0, for: display, showOSD: false) }),
                               text: "\(Int((value * 100).rounded()))%")
             SettingsRowDivider()
-            let dimming = controller.dimming(for: display.id)
-            SettingsSliderRow(title: "Software dimming",
-                              help: "Extra dimming through the color table, independent of the backlight.",
-                              value: Binding(get: { controller.dimming(for: display.id) },
-                                             set: { controller.setDimming($0, for: display) }),
-                              range: 0.1...1,
-                              text: "\(Int((dimming * 100).rounded()))%")
-            SettingsRowDivider()
+            // With combined brightness the slider above already drives the
+            // color-table dimming (its lower quarter). A second control for the
+            // same value made that slider jump and then drop the backlight.
+            if !controller.usesCombinedBrightness(display) {
+                let dimming = controller.dimming(for: display.id)
+                SettingsSliderRow(title: "Software dimming",
+                                  help: "Extra dimming through the color table, independent of the backlight.",
+                                  value: Binding(get: { controller.dimming(for: display.id) },
+                                                 set: { controller.setDimming($0, for: display) }),
+                                  range: 0.1...1,
+                                  text: "\(Int((dimming * 100).rounded()))%")
+                SettingsRowDivider()
+            }
             SettingsButtonRow {
                 Button("Reset Brightness and Dimming") { controller.resetAdjustments(for: display) }
             }
@@ -779,8 +808,14 @@ private struct DeviceControlCard: View {
                 SettingsRowDivider()
                 SettingsButtonRow {
                     Button("Try Again") {
-                        DDCController.shared.invalidate(display: display.id)
-                        controller.redetect()
+                        let id = display.id
+                        // Waits for a DDC transaction in progress, and a slow
+                        // probe of this very monitor is the likely one: keep
+                        // that wait off the main thread.
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            DDCController.shared.invalidate(display: id)
+                            DispatchQueue.main.async { controller.redetect() }
+                        }
                     }
                 }
             }
@@ -972,13 +1007,13 @@ private struct DDCAdvancedSheet: View {
                 }
             }
             SettingsCard {
-                SettingsRow(title: "Raw VCP", help: "Reads or writes any VCP code. Writing unknown codes can change monitor settings.") {
+                SettingsRow(title: "Raw VCP", help: "Reads or writes any VCP code. The code is hexadecimal (10, 0x60), the value decimal (0–65535). Writing unknown codes can change monitor settings.") {
                     HStack {
                         TextField("Code", text: $rawCode).frame(width: 54)
                         TextField("Value", text: $rawValue).frame(width: 64)
                         Button("Read") { rawRead() }
                         Button("Write") { rawWrite() }
-                            .disabled(Int(rawValue) == nil || UInt8(rawCode, radix: 16) == nil)
+                            .disabled(parsedRawValue == nil || parsedRawCode == nil)
                     }
                 }
                 if let rawResult {
@@ -1014,8 +1049,34 @@ private struct DDCAdvancedSheet: View {
         }
     }
 
+    /// The code field as a VCP code: hex, with or without a `0x` prefix.
+    private var parsedRawCode: UInt8? {
+        let text = rawCode.trimmingCharacters(in: .whitespaces).lowercased()
+        return UInt8(text.hasPrefix("0x") ? String(text.dropFirst(2)) : text, radix: 16)
+    }
+
+    /// The value field, when it is a value a VCP write can carry.
+    private var parsedRawValue: Int? {
+        guard let value = Int(rawValue.trimmingCharacters(in: .whitespaces)), (0...0xFFFF).contains(value) else {
+            return nil
+        }
+        return value
+    }
+
+    /// Codes that reset the monitor, switch its input or power it down. Their
+    /// dedicated controls ask first, so the raw path does too.
+    private static let disruptiveCodes: [UInt8: String] = [
+        0x04: "restores the monitor's factory defaults",
+        0x05: "restores the factory brightness and contrast",
+        0x06: "restores the factory geometry",
+        0x08: "restores the factory color settings",
+        0x0A: "restores the factory TV defaults",
+        0x60: "switches the monitor's input, which can leave this Mac without a picture on it",
+        0xD6: "changes the monitor's power mode and can turn the panel off",
+    ]
+
     private func rawRead() {
-        guard let code = UInt8(rawCode, radix: 16) else { rawResult = "invalid code"; return }
+        guard let code = parsedRawCode else { rawResult = "invalid code"; return }
         let id = display.id
         rawResult = "…"
         DispatchQueue.global(qos: .userInitiated).async {
@@ -1031,11 +1092,27 @@ private struct DDCAdvancedSheet: View {
     }
 
     private func rawWrite() {
-        guard let code = UInt8(rawCode, radix: 16), let value = Int(rawValue) else { return }
+        guard let code = parsedRawCode, let value = parsedRawValue else {
+            rawResult = "invalid code or value"
+            return
+        }
+        if let effect = Self.disruptiveCodes[code] {
+            let alert = NSAlert()
+            alert.messageText = String(format: "Write %d to VCP code %02X on %@?", value, code, display.name)
+            alert.informativeText = "This code \(effect)."
+            alert.addButton(withTitle: "Write")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
         let id = display.id
         DispatchQueue.global(qos: .userInitiated).async {
             let ok = DDCController.shared.write(code: code, value: value, display: id)
-            DispatchQueue.main.async { rawResult = ok ? "sent" : "write failed" }
+            DispatchQueue.main.async {
+                rawResult = ok ? "sent" : "write failed"
+                // The write went around the controller: read the values again
+                // so the sliders show what the monitor has now.
+                if ok { controller.redetect() }
+            }
         }
     }
 
@@ -1129,12 +1206,17 @@ struct ApplicationSettingsView: View {
     }
 
     private func updateLoginItem(_ enabled: Bool) {
+        // Nothing to do when the switch already matches the system (this also
+        // ends the change triggered by putting the switch back below).
+        guard enabled != (SMAppService.mainApp.status == .enabled) else { return }
         do {
             if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
             store.state.general.launchAtLogin = enabled
             status = nil
         } catch {
             status = "Could not update the login item: \(error.localizedDescription)"
+            // Show what is really registered, not what was asked for.
+            launchAtLogin = SMAppService.mainApp.status == .enabled
         }
     }
 }
