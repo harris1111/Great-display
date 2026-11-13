@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, ci-check]
   pull_request:
   workflow_dispatch:
 
@@ -52,6 +52,31 @@ jobs:
             echo "::error::an unknown command must exit with a non-zero status"
             exit 1
           fi
+
+      - name: Runtime probes (throwaway)
+        run: |
+          APP=dist/GreatDisplay.app/Contents/MacOS/GreatDisplay
+          ID=$("${APP}" --probe | python3 -c 'import json,sys; print(json.load(sys.stdin)["displays"][0]["id"])')
+          echo "display id: ${ID}"
+          run() { echo "--- $*"; set +e; "${APP}" "$@"; echo "exit=$?"; set -e; }
+          run --rotate "${ID}" 99999999999
+          run --rotate "${ID}" 45
+          run --stream-test 9223372036854775807 "${ID}"
+          run --set-brightness "${ID}" nan
+          run --set-brightness "${ID}" 0.5
+          run --mirror "${ID}" off
+          run --mirror "${ID}"
+          run --hdr "${ID}" maybe
+          run --ddc-write "${ID}" 0x10 -1
+          run --ddc-read "${ID}" zz
+          run --ddc-diag
+          run --system-colors dark
+          run --adjust "${ID}" gamma=abc
+          run --adjust "${ID}" gamma=1.1 0.2
+          run --audio-output
+          run --create-virtual 3000 1 1
+          run --create-virtual 10240 2880 1
+          run --self-test skip-disconnect
 
       - name: Package
         env:
