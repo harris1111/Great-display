@@ -358,6 +358,9 @@ public final class VirtualScreenManager: ObservableObject {
             } else if configuration.followOrientation, portrait != (configuration.height > configuration.width) {
                 swap(&shaped.width, &shaped.height)
             }
+            // Compare the geometry update() will actually save so an extreme
+            // associated aspect cannot keep deferring mirroring and streaming.
+            shaped = Self.fitted(shaped)
             if shaped.width != configuration.width || shaped.height != configuration.height {
                 configuration = shaped
                 update(configuration)

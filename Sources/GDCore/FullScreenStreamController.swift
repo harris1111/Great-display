@@ -260,6 +260,7 @@ public final class FullScreenStreamController: ObservableObject {
     }
 
     public func stopAll() {
+        cancelledStarts.formUnion(starting)
         for stream in active {
             stop(stream.id)
         }

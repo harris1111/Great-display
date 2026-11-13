@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Release Notes · Great Display</title>
+  <meta name="description" content="What's new in each version of Great Display, the open-source menu bar display manager for macOS.">
+  <meta name="theme-color" content="#000000">
+  <meta property="og:title" content="Great Display release notes">
+  <meta property="og:image" content="assets/great-display-poster.jpg">
+  <link rel="icon" type="image/png" href="assets/icon.png">
+  <link rel="stylesheet" href="assets/styles.css">
+  <style>
+    .notes-hero { padding: 80px 0 36px; }
+    .notes-hero .lead { max-width: 640px; }
+    .toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+    .toc .chip { padding: 6px 14px; font-size: 13px; color: var(--text); text-decoration: none; }
+    .notes { padding: 20px 0 110px; }
+    .subscribe { margin-top: 26px; color: var(--muted); font-size: 15px; }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav">
+    <div class="wrap">
+      <a class="brand" href="./"><img src="assets/icon.png" alt="" width="26" height="26">Great Display</a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="./#demo" class="optional">Try it</a>
+        <a href="./#features" class="optional">Features</a>
+        <a href="./#install">Install</a>
+        <a href="release-notes.html" aria-current="page">Release Notes</a>
+        <a href="https://github.com/thienduc12311/Great-display" class="optional">GitHub</a>
+      </nav>
+      <a class="btn" href="https://github.com/thienduc12311/Great-display/releases/latest">Download</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="notes-hero">
+      <div class="wrap">
+        <p class="eyebrow">Release Notes</p>
+        <h1 class="display" style="font-size:clamp(40px,7vw,80px)">What's new in<br><span class="gradient">Great Display.</span></h1>
+        <p class="lead">Every version, what changed and where to download it. These notes are generated from the project's changelog, the same text published with each GitHub release.</p>
+        <nav class="toc" data-release-toc aria-label="Versions"></nav>
+        <p class="subscribe">Want to know when a new version ships? Watch the repository on GitHub and choose <em>Releases only</em>, or subscribe to the <a href="https://github.com/thienduc12311/Great-display/releases.atom">releases feed</a>.</p>
+      </div>
+    </section>
+    <section class="notes">
+      <div class="wrap" id="releases"><p class="loading">Loading release notes…</p></div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>Great Display is an independent open-source project, not affiliated with Apple.</span>
+      <nav aria-label="Footer">
+        <a href="./">Home</a>
+        <a href="https://github.com/thienduc12311/Great-display/blob/main/CHANGELOG.md">CHANGELOG.md</a>
+        <a href="https://github.com/thienduc12311/Great-display/releases">All releases on GitHub</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script src="assets/changelog.js"></script>
+  <script>
+    document.documentElement.classList.remove("no-js");
+    GDChangelog.renderAll(document.getElementById("releases"));
+  </script>
+</body>
+</html>

@@ -10,6 +10,12 @@
 </p>
 
 <p align="center">
+  <a href="https://thienduc12311.github.io/Great-display/"><b>Website</b></a> ·
+  <a href="https://thienduc12311.github.io/Great-display/#demo">Try the demo</a> ·
+  <a href="https://thienduc12311.github.io/Great-display/release-notes.html">Release notes</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/thienduc12311/Great-display/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/thienduc12311/Great-display?sort=semver"></a>
   <a href="https://github.com/thienduc12311/Great-display/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/thienduc12311/Great-display/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-blue">
@@ -107,7 +113,7 @@ See [Building](#building) for options.
 | Stream a display | Full-screen stream onto another display or onto itself (self-stream with video filters); per-source options for pointer, 1:1 pixel mapping, integer scaling, free aspect ratio, cropping, flip, rotation, alignment, zoom, underscan, alpha and target FPS, applied live; resume on connect; interactive mode ("Use Like a Normal Screen") moves the pointer onto the source display when it enters the stream, so clicks, typing, scrolling and the source's menu bar work through the stream |
 | Persistence | Settings and per-display configuration stored by display identity |
 | Login item | Optional launch at login through `SMAppService` |
-| Settings window | Sidebar with Displays overview, a page per display, Virtual Screens, Application, Menu, Keyboard and About |
+| Settings window | Searchable sidebar listing every display and virtual screen; a visual arrangement overview with quick brightness controls; per-display Picture, Color, Monitor and Options tabs; General, Menu Bar (with live preview), Keyboard & OSD and About |
 | Menu bar icon | Click opens the menu, Option-click opens Settings, right-click opens a quick menu |
 | Deep links | `greatdisplay://settings`, `greatdisplay://display/<id>`, `greatdisplay://brighten` |
 
@@ -195,6 +201,12 @@ Accessibility and Screen Recording grants survive rebuilds. See
   [CHANGELOG.md](CHANGELOG.md) section plus the merged pull requests.
   Developer ID signing and notarization switch on when the signing secrets are
   configured.
+- [`pages.yml`](.github/workflows/pages.yml) publishes the website in
+  [`website/`](website) to GitHub Pages whenever it, `CHANGELOG.md` or the icon
+  changes on `main`, and after each release. The release notes page is built
+  from `CHANGELOG.md`. Preview it locally with `make site-preview`; regenerate
+  the product film with `make promo-video`
+  ([`Scripts/make_promo_video.swift`](Scripts/make_promo_video.swift)).
 
 The release process is described in [docs/RELEASING.md](docs/RELEASING.md).
 

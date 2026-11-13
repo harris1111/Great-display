@@ -83,6 +83,27 @@ change under **Unreleased** in the same pull request.
 - Release builds fail when the app's code signature does not verify, instead
   of being packaged anyway. CI now launches the built app.
 
+## [1.1.0] - 2026-11-12
+
+### Added
+
+- **Website** at https://thienduc12311.github.io/Great-display/ with an
+  interactive demo of the menu, a short product film and release notes built
+  from this changelog, published to GitHub Pages by the Website workflow.
+
+### Changed
+
+- **Redesigned Settings window.** The sidebar now lists every display and
+  virtual screen directly, with a live thumbnail, current mode and a Main
+  badge, plus a search field that jumps straight to any setting. All Displays
+  shows a clickable map of the desktop arrangement, quick brightness sliders
+  and notices for anything that needs attention. Each display page is split
+  into Picture, Color, Monitor and Options tabs, with "Looks like" resolution
+  tiles and one-click color presets (Cool, Warm, Evening, Reading). Menu Bar
+  settings show a live preview of the menu, Keyboard & OSD has step-size
+  presets and an OSD preview, and explanations can move behind ⓘ buttons
+  (General › Show explanations).
+
 ## [1.0.0] - 2026-11-12
 
 First public release.
@@ -126,5 +147,6 @@ First public release.
 - Universal (Apple Silicon and Intel) DMG and ZIP builds published by GitHub
   Actions.
 
-[Unreleased]: https://github.com/thienduc12311/Great-display/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/thienduc12311/Great-display/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/thienduc12311/Great-display/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/thienduc12311/Great-display/releases/tag/v1.0.0
