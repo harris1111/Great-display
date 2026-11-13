@@ -161,6 +161,9 @@ GreatDisplay --help
 ```
 
 Commands exit with 0 on success and a non-zero status otherwise.
+Quit the GUI before using `--disconnect` or `--reconnect`; these commands exit
+with status 4 if another instance is running, to avoid conflicting settings
+writes. Keep the GUI closed until the command finishes.
 `--create-virtual` keeps the screen for `holdSeconds` (2 by default) and then
 removes it. `--set-brightness` sets hardware brightness (native or DDC/CI);
 software dimming only lasts while the app runs, so it is not offered here.

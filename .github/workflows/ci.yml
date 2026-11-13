@@ -52,6 +52,14 @@ jobs:
             echo "::error::an unknown command must exit with a non-zero status"
             exit 1
           fi
+          for HOLD in inf -inf nan invalid; do
+            STATUS=0
+            "${APP}" --create-virtual 1920 1080 "${HOLD}" || STATUS=$?
+            if [ "${STATUS}" -ne 2 ]; then
+              echo "::error::invalid hold duration ${HOLD} must exit 2 (got ${STATUS})"
+              exit 1
+            fi
+          done
 
       - name: Package
         env:

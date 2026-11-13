@@ -35,6 +35,14 @@ change under **Unreleased** in the same pull request.
 
 ### Fixed
 
+- A DDC capabilities read could use a released service when another thread
+  invalidated the monitor binding between reply fragments.
+- Turning off Launch at login while approval was pending did not unregister it.
+- A display ID reused by another monitor could inherit its old gamma table
+  and software dimming.
+- `--create-virtual` rejects non-finite or malformed hold durations before
+  creating a display. Connection CLI commands refuse to run alongside the GUI
+  to avoid overwriting each other's saved disconnect state.
 - A stream that the system ended (sleep, the stop-sharing control) left its
   window over the display showing the last frame; the stream is now removed.
 - Esc did not stop a stream, because the stream window could not receive key
@@ -79,7 +87,8 @@ change under **Unreleased** in the same pull request.
   numbers; `--ddc-write` and `--ddc-read` accept `0x` codes and reject bad
   ones; `--hdr`, `--system-colors` and `--adjust` reject invalid values and
   report failures; `--audio-output` and `--ddc-burst` no longer connect saved
-  virtual screens or save test values; `--disconnect` is remembered by the app.
+  virtual screens or save test values; `--disconnect` is remembered on the
+  app's next launch (the GUI must remain closed while the command runs).
 - Release builds fail when the app's code signature does not verify, instead
   of being packaged anyway. CI now launches the built app.
 

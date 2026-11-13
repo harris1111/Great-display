@@ -27,6 +27,8 @@ public final class DisplayController: ObservableObject {
     private let manager = DisplayManager.shared
     private let engine = BrightnessEngine.shared
     private let ddc = DDCController.shared
+    private var rememberedDimming: [String: Double] = [:]
+    private var displayGenerations: [CGDirectDisplayID: UInt64] = [:]
 
     private init() {
         // DisplayManager publishes on the main actor; delivering synchronously
@@ -35,9 +37,9 @@ public final class DisplayController: ObservableObject {
         manager.$displays
             .sink { [weak self] displays in
                 guard let self else { return }
-                let previousIDs = Set(self.displays.map(\.id))
+                let previous = self.displays
                 self.displays = displays
-                self.displaysDidChange(from: previousIDs, to: Set(displays.map(\.id)))
+                self.displaysDidChange(from: previous, to: displays)
                 for display in displays where !self.modeInFlight.contains(display.id) {
                     if let pending = self.pendingMode[display.id], let current = display.currentMode,
                        current.matches(pending), current.isHiDPI == pending.isHiDPI {
@@ -89,8 +91,13 @@ public final class DisplayController: ObservableObject {
     }
 
     /// Keeps per-display state in step with displays coming and going.
-    private func displaysDidChange(from previous: Set<CGDirectDisplayID>, to current: Set<CGDirectDisplayID>) {
-        for id in previous.subtracting(current) {
+    private func displaysDidChange(from previous: [DisplayInfo], to current: [DisplayInfo]) {
+        let oldIdentities = Dictionary(uniqueKeysWithValues: previous.map { ($0.id, $0.identity) })
+        let newIdentities = Dictionary(uniqueKeysWithValues: current.map { ($0.id, $0.identity) })
+        for display in previous where newIdentities[display.id] != display.identity {
+            let id = display.id
+            displayGenerations[id, default: 0] &+= 1
+            rememberedDimming[display.identity] = engine.currentSoftwareDimming(id)
             // A display ID can be handed to a different monitor later: values
             // read from this one must not be shown for the next.
             brightness.removeValue(forKey: id)
@@ -99,16 +106,22 @@ public final class DisplayController: ObservableObject {
             mute.removeValue(forKey: id)
             inputSource.removeValue(forKey: id)
             adjustments.removeValue(forKey: id)
+            dimming.removeValue(forKey: id)
+            loadedDisplays.remove(id)
+            loadedWithDDC.removeValue(forKey: id)
+            pendingMode.removeValue(forKey: id)
+            queuedMode.removeValue(forKey: id)
+            modeInFlight.remove(id)
             ddcInfo.removeValue(forKey: id)
             lastUserWrite.removeValue(forKey: id)
-            // Drop an untouched colour-table baseline so it is read again
-            // (the colour profile may differ when the display returns).
-            engine.invalidateGamma(id)
+            engine.forgetDisplay(id)
         }
-        for id in current.subtracting(previous) {
-            // A returning display comes back with the profile's table: push
-            // dimming and adjustments that are still in effect for it.
-            engine.reapply(id)
+        for display in current where oldIdentities[display.id] != display.identity {
+            // Preserve session dimming by monitor identity, but capture a fresh
+            // colour-profile baseline when that monitor returns.
+            if let software = rememberedDimming[display.identity] {
+                engine.applySoftwareDimming(software, display: display.id)
+            }
         }
     }
 
@@ -853,16 +866,22 @@ public final class DisplayController: ObservableObject {
             return
         }
         modeInFlight.insert(id)
+        let generation = displayGenerations[id, default: 0]
         Task { @MainActor in
+            guard displayGenerations[id, default: 0] == generation else { return }
             let fade = SettingsStore.shared.state.general.fadeOnModeChange
                 && SettingsStore.shared.state.general.softwareDimmingEnabled
             if fade { await engine.animateTransition(to: 0, duration: 0.14, display: id) }
+            guard displayGenerations[id, default: 0] == generation else { return }
             let ok = await manager.applyMode(mode.mode, for: id)
+            guard displayGenerations[id, default: 0] == generation else { return }
             if fade {
                 // Let the window server finish swapping the framebuffer (and
                 // macOS restore the profile's table) before fading back in.
                 try? await Task.sleep(nanoseconds: 60_000_000)
+                guard displayGenerations[id, default: 0] == generation else { return }
                 await engine.animateTransition(to: 1, duration: 0.26, display: id)
+                guard displayGenerations[id, default: 0] == generation else { return }
                 // The fade captured the colour table as its baseline. If nothing
                 // else is applied, forget it, so a later colour-profile change is
                 // not overwritten with this copy.

@@ -8,7 +8,7 @@ import ServiceManagement
 struct GeneralSettingsView: View {
     @ObservedObject private var store = SettingsStore.shared
     @ObservedObject private var sleep = SleepController.shared
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var launchAtLogin = Self.loginItemRegistered
     @State private var status: String?
     @State private var showDiagnostics = false
 
@@ -17,8 +17,8 @@ struct GeneralSettingsView: View {
                      symbol: "gearshape.fill", tint: .gray) {
             SettingsSectionTitle(title: "Startup", symbol: "power")
             SettingsCard {
-                SettingsToggleRow(title: "Launch at login", help: "Starts Great Display when you log in.", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, newValue in updateLoginItem(newValue) }
+                SettingsToggleRow(title: "Launch at login", help: "Starts Great Display when you log in.",
+                                  isOn: Binding(get: { launchAtLogin }, set: { updateLoginItem($0) }))
                 SettingsRowDivider()
                 SettingsToggleRow(title: "Restore display configuration on launch",
                                   help: "Re-applies saved resolutions, arrangement and main display.",
@@ -102,19 +102,26 @@ struct GeneralSettingsView: View {
         .padding(.vertical, 5)
     }
 
+    private static var loginItemRegistered: Bool {
+        let state = SMAppService.mainApp.status
+        return state == .enabled || state == .requiresApproval
+    }
+
     private func updateLoginItem(_ enabled: Bool) {
-        // Nothing to do when the switch already matches the system (this also
-        // ends the change triggered by putting the switch back below).
-        guard enabled != (SMAppService.mainApp.status == .enabled) else { return }
         do {
-            if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-            store.state.general.launchAtLogin = enabled
+            // Pending approval still means registered, so switching off must
+            // unregister it instead of treating it as already disabled.
+            if enabled != Self.loginItemRegistered {
+                if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+            }
             status = nil
         } catch {
             status = "Could not update the login item: \(error.localizedDescription)"
-            // Show what is really registered, not what was asked for.
-            launchAtLogin = SMAppService.mainApp.status == .enabled
         }
+        // Only the binding setter performs system actions. Updating these
+        // values after an error cannot trigger another registration attempt.
+        launchAtLogin = Self.loginItemRegistered
+        store.state.general.launchAtLogin = launchAtLogin
     }
 
     private func confirmReset() {

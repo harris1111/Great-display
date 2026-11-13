@@ -37,6 +37,7 @@ public final class BrightnessEngine {
     }
 
     private var gammaTables: [CGDirectDisplayID: GammaTable] = [:]
+    private var gammaGenerations: [CGDirectDisplayID: UInt64] = [:]
     private let softwareQueue = DispatchQueue(label: "greatdisplay.brightness.software")
 
     private init() {
@@ -195,6 +196,15 @@ public final class BrightnessEngine {
         }
     }
 
+    /// Removes a departed monitor's baseline and cancels queued writes. Never
+    /// restore that baseline onto a different monitor that inherits its ID.
+    public func forgetDisplay(_ id: CGDirectDisplayID) {
+        softwareQueue.sync {
+            gammaTables.removeValue(forKey: id)
+            gammaGenerations[id, default: 0] &+= 1
+        }
+    }
+
     /// Forgets the captured table so the next change re-reads it (after a
     /// display reconnects or the colour profile changes).
     public func invalidateGamma(_ id: CGDirectDisplayID) {
@@ -232,10 +242,12 @@ public final class BrightnessEngine {
     /// one display only.
     @MainActor
     public func animateTransition(to target: Double, duration: TimeInterval, display id: CGDirectDisplayID) async {
+        let generation = softwareQueue.sync { gammaGenerations[id, default: 0] }
         let start = softwareQueue.sync { gammaTables[id]?.transition ?? 1 }
         let duration = duration.isFinite ? max(0, min(10, duration)) : 0
         let frames = max(1, Int(duration * 60))
         for frame in 1...frames {
+            guard softwareQueue.sync(execute: { gammaGenerations[id, default: 0] == generation }) else { return }
             let t = Double(frame) / Double(frames)
             let eased = t < 0.5 ? 2 * t * t : 1 - pow(-2 * t + 2, 2) / 2
             setTransition(start + (target - start) * eased, display: id)
@@ -251,8 +263,11 @@ public final class BrightnessEngine {
     }
 
     private func schedulePush(_ table: GammaTable, display id: CGDirectDisplayID) {
+        let generation = gammaGenerations[id, default: 0]
         DispatchQueue.main.async { [weak self] in
-            self?.pushGamma(table, display: id)
+            guard let self,
+                  self.softwareQueue.sync(execute: { self.gammaGenerations[id, default: 0] == generation }) else { return }
+            self.pushGamma(table, display: id)
         }
     }
 

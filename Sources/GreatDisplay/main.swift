@@ -12,6 +12,19 @@ private func parseHexByte(_ text: String) -> UInt8? {
     return UInt8(digits, radix: 16)
 }
 
+/// Connection commands persist a settings snapshot. A running GUI owns a
+/// separate snapshot, so it must be closed before the CLI changes this state.
+private func connectionCommandCanRun() -> Bool {
+    let bundleID = Bundle.main.bundleIdentifier ?? "app.greatdisplay.GreatDisplay"
+    let otherApp = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+        .contains { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier && !$0.isTerminated }
+    guard !otherApp else {
+        printError("Quit Great Display before using --disconnect or --reconnect, or use its display controls while it is running.")
+        return false
+    }
+    return true
+}
+
 /// Command line helpers make the app testable without the menu bar UI.
 @MainActor
 func runCommandLine(_ arguments: [String]) -> Int32 {
@@ -280,6 +293,7 @@ func runCommandLine(_ arguments: [String]) -> Int32 {
             FileHandle.standardError.write(Data("usage: --disconnect <displayID> [reconnectAfterSeconds]\n".utf8))
             return 2
         }
+        guard connectionCommandCanRun() else { return 4 }
         DisplayManager.shared.refresh()
         guard DisplayManager.shared.disconnect(id) else {
             print(DisplayManager.shared.lastError ?? "disconnect failed")
@@ -309,6 +323,7 @@ func runCommandLine(_ arguments: [String]) -> Int32 {
             FileHandle.standardError.write(Data("usage: --reconnect <displayID>\n".utf8))
             return 2
         }
+        guard connectionCommandCanRun() else { return 4 }
         let ok = DisplayManager.shared.reconnect(id)
         if ok {
             SettingsStore.shared.state.disconnectedDisplays.removeAll { $0.id == id }
@@ -682,7 +697,11 @@ func runCommandLine(_ arguments: [String]) -> Int32 {
             FileHandle.standardError.write(Data("usage: --create-virtual <width> <height> [holdSeconds]\n".utf8))
             return 2
         }
-        let holdSeconds = arguments.count > 4 ? (Double(arguments[4]) ?? 2.0) : 2.0
+        guard let holdSeconds = arguments.count > 4 ? Double(arguments[4]) : 2.0,
+              holdSeconds.isFinite else {
+            printError("holdSeconds must be a finite number")
+            return 2
+        }
         var configuration = VirtualScreenConfiguration()
         configuration.width = Int(width)
         configuration.height = Int(height)

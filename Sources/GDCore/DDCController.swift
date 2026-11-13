@@ -87,6 +87,8 @@ public final class DDCController {
     private var unsupported: [CGDirectDisplayID: Set<UInt8>] = [:]
     private var lastTransaction: [CGDirectDisplayID: Date] = [:]
     private var capabilityCache: [CGDirectDisplayID: DDCCapabilities] = [:]
+    /// Transaction-lock protected epochs reject results from unbound services.
+    private var bindingGenerations: [CGDirectDisplayID: UInt64] = [:]
 
     /// DDC is a single shared side channel: transactions and the service cache
     /// are serialized so concurrent callers cannot interleave frames or mutate
@@ -152,11 +154,13 @@ public final class DDCController {
         Unmanaged<AnyObject>.fromOpaque(service).release()
     }
 
-    /// Unbinds a display from its service. Callers hold `lock`, so no
-    /// transaction is using the service while it is released.
+    /// Unbinds a display from its service. Callers hold `lock`; fragmented
+    /// capabilities reads retain their own reference between transactions.
     private func dropService(for id: CGDirectDisplayID) {
         serviceLock.lock()
         defer { serviceLock.unlock() }
+        bindingGenerations[id, default: 0] &+= 1
+        capabilityCache.removeValue(forKey: id)
         if let cached = services.removeValue(forKey: id) { release(cached) }
         if let entry = serviceEntries.removeValue(forKey: id) { claimed.remove(entry) }
         unmatched.removeValue(forKey: id)
@@ -464,7 +468,11 @@ public final class DDCController {
         lock.lock()
         if let cached = capabilityCache[id] { lock.unlock(); return cached }
         guard let service = service(for: id) else { lock.unlock(); return nil }
+        // Invalidation may release the cache's ownership between fragments.
+        _ = Unmanaged<AnyObject>.fromOpaque(service).retain()
+        let generation = bindingGenerations[id, default: 0]
         lock.unlock()
+        defer { release(service) }
         var data: [UInt8] = []
         var offset = 0
         var failures = 0
@@ -474,6 +482,7 @@ public final class DDCController {
             yieldToWriters()
             lock.lock()
             defer { lock.unlock() }
+            guard bindingGenerations[id, default: 0] == generation else { return nil }
             pace(id)
             let hi = UInt8((offset >> 8) & 0xFF), lo = UInt8(offset & 0xFF)
             let checksum: UInt8 = (0x6E ^ 0x51 ^ 0x83 ^ 0xF3 as UInt8) ^ hi ^ lo
@@ -504,8 +513,9 @@ public final class DDCController {
         guard !printable.isEmpty, let text = String(bytes: printable, encoding: .ascii) else { return nil }
         let parsed = DDCCapabilities(raw: text)
         lock.lock()
+        defer { lock.unlock() }
+        guard bindingGenerations[id, default: 0] == generation else { return nil }
         capabilityCache[id] = parsed
-        lock.unlock()
         return parsed
     }
 
