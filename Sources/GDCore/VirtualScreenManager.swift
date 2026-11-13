@@ -252,6 +252,7 @@ public final class VirtualScreenManager: ObservableObject {
 
     /// Screens with a (re)creation scheduled; association rules leave them alone.
     private var pendingCreates: Set<UUID> = []
+    private var creationGeneration = UUID()
 
     public func isCreationPending(_ configuration: VirtualScreenConfiguration) -> Bool {
         pendingCreates.contains(configuration.id)
@@ -262,8 +263,12 @@ public final class VirtualScreenManager: ObservableObject {
     private func scheduleCreate(_ configuration: VirtualScreenConfiguration, after delay: TimeInterval) {
         guard !pendingCreates.contains(configuration.id) else { return }
         pendingCreates.insert(configuration.id)
+        let generation = creationGeneration
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            // Reset/teardown invalidates sleeping work without letting an old
+            // task remove a newer request for the same screen.
+            guard generation == self.creationGeneration else { return }
             self.pendingCreates.remove(configuration.id)
             guard self.handles[configuration.id] == nil else { return }
             let saved = SettingsStore.shared.state.virtualScreens.first { $0.id == configuration.id }
@@ -288,6 +293,8 @@ public final class VirtualScreenManager: ObservableObject {
     }
 
     public func destroyAll() {
+        creationGeneration = UUID()
+        pendingCreates.removeAll()
         for id in Array(handles.keys) { destroy(id) }
     }
 
