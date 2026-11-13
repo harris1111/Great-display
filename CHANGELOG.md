@@ -9,6 +9,12 @@ change under **Unreleased** in the same pull request.
 
 ## [Unreleased]
 
+### Added
+
+- **Website** at https://thienduc12311.github.io/Great-display/ with an
+  interactive demo of the menu, a short product film and release notes built
+  from this changelog, published to GitHub Pages by the Website workflow.
+
 ## [1.0.0] - 2026-11-12
 
 First public release.
